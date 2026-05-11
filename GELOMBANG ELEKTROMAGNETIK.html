@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes, viewport-fit=cover">
-  <title>🌌 Simulasi Gelombang EM 3D Lambat | Fisika SMA</title>
+  <title>🌌 Simulasi Gelombang EM 3D Real-time | Fisika SMA</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
@@ -117,6 +117,11 @@
       padding: 0.4rem; border-radius: 1.2rem; background: #15203b; border: 1px solid #3c60aa; color: white; font-size: 0.8rem;
     }
     .leaderboard { background: #0e1a2b; border-radius: 1rem; padding: 0.5rem; margin-top: 0.5rem; font-size: 0.8rem; }
+    .live-indicator {
+      display: inline-block; width: 8px; height: 8px; background: #4f8; border-radius: 50%;
+      animation: pulse 1.5s infinite; margin-right: 4px;
+    }
+    @keyframes pulse { 0% { opacity:1; } 50% { opacity:0.3; } 100% { opacity:1; } }
   </style>
 </head>
 <body>
@@ -179,7 +184,11 @@
         <h3 id="qText"></h3>
         <div id="optionsBox" style="display:flex; flex-direction:column; gap:0.3rem;"></div>
         <div id="feedbackMsg"></div>
-        <div class="leaderboard"><h4>🏆 Leaderboard</h4><div id="liveRanking"></div></div>
+        <div class="leaderboard">
+          <h4><span class="live-indicator"></span> 🏆 Leaderboard Live</h4>
+          <div id="liveRanking">Menunggu peserta...</div>
+          <small style="color:#8af;">Data diperbarui otomatis antar peserta</small>
+        </div>
       </div>
     </div>
   </div>
@@ -192,9 +201,10 @@
       <button class="btn" id="loginAdminBtn">Masuk</button>
     </div>
     <div id="adminPanel" style="display:none;">
-      <h3>📋 Data Peserta</h3>
-      <button class="btn" id="refreshAdmin">Refresh</button>
-      <div id="adminData" style="margin-top:1rem;"></div>
+      <h3>📋 Data Peserta (Real-time)</h3>
+      <button class="btn" id="refreshAdmin">🔄 Refresh</button>
+      <button class="btn" id="exportCSV">📥 Export CSV</button>
+      <div id="adminData" style="margin-top:1rem; max-height:400px; overflow-y:auto;"></div>
     </div>
   </div>
 </div>
@@ -206,7 +216,7 @@
   (() => {
     // Global state
     const c = 3e8;
-    let logFreq = 14.5;      // log10(Hz)
+    let logFreq = 14.5;
     let isPlaying = true;
     let participants = JSON.parse(localStorage.getItem('em3dPeserta') || '[]');
     let currentUser = null, quizActive = false, currentQIdx = 0, score = 0, timerId = null, timeRemain = 10;
@@ -223,7 +233,41 @@
       { q:"GPS memakai gelombang?", o:["Mikro","Sinar X","UV","Cahaya tampak"], a:0}
     ];
 
-    // Audio
+    // ========== REALTIME BROADCAST CHANNEL ==========
+    const channel = new BroadcastChannel('em-wave-quiz');
+    
+    channel.onmessage = (event) => {
+      const { type, payload } = event.data;
+      
+      if (type === 'PARTICIPANTS_SYNC') {
+        participants = payload;
+        localStorage.setItem('em3dPeserta', JSON.stringify(participants));
+        updateLeaderboard();
+        if (document.getElementById('adminPanel').style.display === 'block') {
+          refreshAdminData();
+        }
+      }
+      
+      if (type === 'REQUEST_SYNC') {
+        // Kirim data terbaru ke yang meminta
+        channel.postMessage({
+          type: 'PARTICIPANTS_SYNC',
+          payload: participants
+        });
+      }
+    };
+
+    // Minta sync saat pertama kali buka
+    channel.postMessage({ type: 'REQUEST_SYNC' });
+
+    function broadcastParticipants() {
+      channel.postMessage({
+        type: 'PARTICIPANTS_SYNC',
+        payload: participants
+      });
+    }
+
+    // ========== AUDIO ==========
     let audioCtx = null;
     function initAudio() {
       if (audioCtx) return;
@@ -237,7 +281,7 @@
     }
     document.body.addEventListener('click', initAudio, { once: true });
 
-    // Tab navigation
+    // ========== TAB NAVIGATION ==========
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -247,14 +291,20 @@
         document.getElementById('page' + target.charAt(0).toUpperCase() + target.slice(1)).classList.add('active');
         if (target === 'simulasi') start3D();
         else stop3D();
-        if (target === 'admin') { document.getElementById('adminPanel').style.display = 'none'; document.getElementById('adminLock').style.display = 'block'; }
+        if (target === 'admin') { 
+          document.getElementById('adminPanel').style.display = 'none'; 
+          document.getElementById('adminLock').style.display = 'block'; 
+        }
+        if (target === 'quiz') {
+          updateLeaderboard();
+        }
       });
     });
 
-    // ---------- 3D SIMULATION (SUPER LAMBAT) ----------
+    // ========== 3D SIMULATION ==========
     let scene, camera, renderer, controls, waveGroup, animationId;
     const container3D = document.getElementById('threeContainer');
-    const timeScale = 0.001;  // sangat lambat agar propagasi teramati
+    const timeScale = 0.001;
 
     function init3D() {
       scene = new THREE.Scene();
@@ -271,7 +321,6 @@
       controls.target.set(0, 0, 1.8);
       controls.update();
 
-      // Sumbu tipis
       const axisLen = 3.2;
       const makeAxis = (dir, color) => {
         const mat = new THREE.LineBasicMaterial({ color });
@@ -303,7 +352,6 @@
       const zStart = -0.8, zEnd = 4.2, segments = 320;
       const step = (zEnd - zStart) / segments;
 
-      // E field (merah)
       const ptsE = [];
       for (let i = 0; i <= segments; i++) {
         const z = zStart + i * step;
@@ -314,7 +362,6 @@
         new THREE.LineBasicMaterial({ color: 0xff5555 })
       ));
 
-      // B field (biru)
       const ptsB = [];
       for (let i = 0; i <= segments; i++) {
         const z = zStart + i * step;
@@ -325,7 +372,6 @@
         new THREE.LineBasicMaterial({ color: 0x5588ff })
       ));
 
-      // Titik kecil untuk menandai puncak
       const dotMat = new THREE.MeshBasicMaterial({ color: 0xffaaaa });
       for (let z = zStart; z <= zEnd; z += 0.25) {
         const x = amplitude * Math.sin(k * z - omega * t);
@@ -348,7 +394,6 @@
     function start3D() { if (!scene) init3D(); threeActive = true; animate3D(); }
     function stop3D() { threeActive = false; if (animationId) cancelAnimationFrame(animationId); }
 
-    // Sliders & perhitungan
     document.getElementById('freqLogSlider').addEventListener('input', (e) => { logFreq = parseFloat(e.target.value); updateUI(); });
     document.getElementById('lambdaLogSlider').addEventListener('input', (e) => {
       logFreq = Math.log10(c / Math.pow(10, parseFloat(e.target.value)));
@@ -380,18 +425,18 @@
 
     document.getElementById('playPause3d').addEventListener('click', () => { isPlaying = !isPlaying; });
 
-    // ---------- TEKNOLOGI 2D + SPEKTRUM ----------
+    // ========== TEKNOLOGI 2D ==========
     const techCanvas = document.getElementById('techCanvas2D');
     const tctx = techCanvas.getContext('2d');
     let techAnimId, currentTech = 'wifi';
     const techDB = {
-      wifi:   { icon:'📶', nama:'WiFi', color:'#4a9eff', freqGHz:2.4,  logF:9.4, desc:'Gelombang radio/mikro dari router ke perangkat.' },
-      radio:  { icon:'📻', nama:'Radio', color:'#3a6ea5', freqGHz:0.1, logF:8, desc:'Stasiun radio memancarkan sinyal audio.' },
-      gps:    { icon:'🛰️', nama:'GPS', color:'#5b9bd5', freqGHz:1.5, logF:9.2, desc:'Satelit mengirim sinyal mikro ke penerima.' },
-      remote: { icon:'📺', nama:'Remote TV', color:'#e06c6c', freqGHz:300, logF:11.5, desc:'LED inframerah mengirim pulsa ke sensor.' },
-      sinarx: { icon:'🩻', nama:'Sinar X', color:'#f0f9ff', freqGHz:1e9, logF:18, desc:'Sinar X menembus tubuh untuk citra.' },
-      microwave:{ icon:'♨️', nama:'Microwave', color:'#4a9eff', freqGHz:2.45, logF:9.4, desc:'Memutar molekul air, menghasilkan panas.' },
-      hp:     { icon:'📱', nama:'HP', color:'#2a4a9e', freqGHz:0.8, logF:8.9, desc:'HP mengirim sinyal ke BTS.' }
+      wifi:   { icon:'📶', nama:'WiFi', color:'#4a9eff', freqGHz:2.4, desc:'Gelombang radio/mikro dari router ke perangkat.' },
+      radio:  { icon:'📻', nama:'Radio', color:'#3a6ea5', freqGHz:0.1, desc:'Stasiun radio memancarkan sinyal audio.' },
+      gps:    { icon:'🛰️', nama:'GPS', color:'#5b9bd5', freqGHz:1.5, desc:'Satelit mengirim sinyal mikro ke penerima.' },
+      remote: { icon:'📺', nama:'Remote TV', color:'#e06c6c', freqGHz:300, desc:'LED inframerah mengirim pulsa ke sensor.' },
+      sinarx: { icon:'🩻', nama:'Sinar X', color:'#f0f9ff', freqGHz:1e9, desc:'Sinar X menembus tubuh untuk citra.' },
+      microwave:{ icon:'♨️', nama:'Microwave', color:'#4a9eff', freqGHz:2.45, desc:'Memutar molekul air, menghasilkan panas.' },
+      hp:     { icon:'📱', nama:'HP', color:'#2a4a9e', freqGHz:0.8, desc:'HP mengirim sinyal ke BTS.' }
     };
 
     function drawTechSim() {
@@ -400,11 +445,10 @@
       const w = techCanvas.width, h = techCanvas.height;
       const freq = tech.freqGHz * 1e9;
       const omega = 2 * Math.PI * freq;
-      const t = performance.now() / 1000 * 0.15; // juga lambat
+      const t = performance.now() / 1000 * 0.15;
       const amplitude = 38;
       const srcX = 90, dstX = w - 90, midY = h/2;
 
-      // Spektrum warna background
       const grad = tctx.createLinearGradient(0, 0, w, 0);
       grad.addColorStop(0, '#2a4a9e'); grad.addColorStop(0.2, '#3b82c4'); grad.addColorStop(0.4, '#b53b3b');
       grad.addColorStop(0.55, '#f59e0b'); grad.addColorStop(0.7, '#b453cf'); grad.addColorStop(0.85, '#f0f9ff'); grad.addColorStop(1, '#d946ef');
@@ -413,7 +457,6 @@
       tctx.fillRect(0, 0, w, h);
       tctx.globalAlpha = 1;
 
-      // Sumber & Penerima
       tctx.fillStyle = '#1e3044';
       tctx.fillRect(srcX-28, midY-28, 56, 56);
       tctx.fillRect(dstX-28, midY-28, 56, 56);
@@ -425,14 +468,12 @@
       tctx.fillText('Sumber', srcX-24, midY+45);
       tctx.fillText('Penerima', dstX-28, midY+45);
 
-      // Indikator spektrum
       tctx.fillStyle = tech.color;
       tctx.fillRect(20, 20, 60, 6);
       tctx.fillStyle = 'white';
       tctx.font = '10px sans-serif';
       tctx.fillText(`λ ≈ ${(c/freq).toExponential(1)} m`, 20, 16);
 
-      // Gelombang EM
       tctx.beginPath();
       tctx.strokeStyle = tech.color;
       tctx.lineWidth = 2.5;
@@ -471,89 +512,173 @@
       });
     }
 
-    // Quiz
-    function save() { localStorage.setItem('em3dPeserta', JSON.stringify(participants)); }
-    function lbUpdate() {
-      const sorted = [...participants].sort((a,b)=>b.score-a.score);
-      document.getElementById('liveRanking').innerHTML = sorted.slice(0,6).map((p,i)=>`${i+1}. ${p.name} - ${p.score}`).join('<br>');
+    // ========== QUIZ REAL-TIME ==========
+    function saveParticipants() {
+      localStorage.setItem('em3dPeserta', JSON.stringify(participants));
+      broadcastParticipants(); // broadcast ke semua
     }
+    
+    function updateLeaderboard() {
+      const sorted = [...participants].sort((a,b) => b.score - a.score);
+      const list = document.getElementById('liveRanking');
+      if (sorted.length === 0) {
+        list.innerHTML = 'Belum ada peserta.';
+      } else {
+        list.innerHTML = sorted.slice(0, 10).map((p,i) => 
+          `${i+1}. ${p.name} - ${p.score} poin`
+        ).join('<br>');
+      }
+    }
+
     document.getElementById('joinQuizBtn').addEventListener('click', ()=>{
       const name = document.getElementById('studentName').value.trim();
       if(!name) return alert('Masukkan nama!');
-      currentUser={name,score:0}; score=0; currentQIdx=0; quizActive=true;
-      document.getElementById('loginPanel').style.display='none';
-      document.getElementById('activeQuiz').style.display='block';
+      
+      // Cek apakah nama sudah ada
+      const existing = participants.find(p => p.name === name);
+      if (existing) {
+        if (!confirm(`Nama "${name}" sudah ada. Lanjutkan dengan nama ini?`)) return;
+      }
+      
+      currentUser = { name, score: 0 };
+      score = 0; currentQIdx = 0; quizActive = true;
+      
+      // Tambahkan peserta baru
+      if (!existing) {
+        participants.push(currentUser);
+        saveParticipants();
+      }
+      
+      document.getElementById('loginPanel').style.display = 'none';
+      document.getElementById('activeQuiz').style.display = 'block';
+      updateLeaderboard();
       showQ();
     });
+
     function showQ() {
-      if(currentQIdx>=questions.length){ endQuiz(); return; }
-      const q=questions[currentQIdx];
-      document.getElementById('qCounter').textContent=`${currentQIdx+1}/${questions.length}`;
-      document.getElementById('qText').textContent=q.q;
-      const opt=document.getElementById('optionsBox'); opt.innerHTML='';
-      timeRemain=10; const qs=Date.now();
-      document.getElementById('timerSpan').textContent=`⏳ ${timeRemain}s`;
+      if(currentQIdx >= questions.length) { endQuiz(); return; }
+      const q = questions[currentQIdx];
+      document.getElementById('qCounter').textContent = `${currentQIdx+1}/${questions.length}`;
+      document.getElementById('qText').textContent = q.q;
+      const opt = document.getElementById('optionsBox'); 
+      opt.innerHTML = '';
+      timeRemain = 10; 
+      const qs = Date.now();
+      document.getElementById('timerSpan').textContent = `⏳ ${timeRemain}s`;
       clearInterval(timerId);
-      timerId=setInterval(()=>{
+      timerId = setInterval(() => {
         timeRemain--;
-        document.getElementById('timerSpan').textContent=`⏳ ${timeRemain}s`;
-        if(timeRemain<=0){ clearInterval(timerId); handleA(-1,qs); }
-      },1000);
-      q.o.forEach((o,i)=>{
-        const b=document.createElement('button'); b.className='btn'; b.textContent=o;
-        b.onclick=()=>handleA(i,qs); opt.appendChild(b);
+        document.getElementById('timerSpan').textContent = `⏳ ${timeRemain}s`;
+        if(timeRemain <= 0) { 
+          clearInterval(timerId); 
+          handleA(-1, qs); 
+        }
+      }, 1000);
+      q.o.forEach((o, i) => {
+        const b = document.createElement('button'); 
+        b.className = 'btn'; 
+        b.textContent = o;
+        b.onclick = () => handleA(i, qs); 
+        opt.appendChild(b);
       });
     }
-    function handleA(chosen,qs){
+
+    function handleA(chosen, qs) {
       clearInterval(timerId);
-      const correct=questions[currentQIdx].a;
-      const elapsed=(Date.now()-qs)/1000;
-      let pts=0;
-      if(chosen===correct){
-        pts=Math.max(10,Math.round(100-elapsed*9));
-        document.getElementById('feedbackMsg').innerHTML='✅ Benar!';
-      } else document.getElementById('feedbackMsg').innerHTML='❌ Salah';
-      score+=pts; currentQIdx++;
-      if(currentUser) currentUser.score=score;
-      lbUpdate();
-      setTimeout(()=>{
-        document.getElementById('feedbackMsg').innerHTML='';
-        if(currentQIdx<questions.length) showQ();
-        else endQuiz();
-      },1000);
-    }
-    function endQuiz(){
-      quizActive=false; clearInterval(timerId);
-      if(currentUser){
-        const idx=participants.findIndex(p=>p.name===currentUser.name);
-        if(idx!==-1) participants[idx]=currentUser; else participants.push(currentUser);
-        save();
+      const correct = questions[currentQIdx].a;
+      const elapsed = (Date.now() - qs) / 1000;
+      let pts = 0;
+      if(chosen === correct) {
+        pts = Math.max(10, Math.round(100 - elapsed * 9));
+        document.getElementById('feedbackMsg').innerHTML = '✅ Benar!';
+      } else {
+        document.getElementById('feedbackMsg').innerHTML = '❌ Salah';
       }
-      document.getElementById('activeQuiz').style.display='none';
-      document.getElementById('loginPanel').style.display='flex';
-      lbUpdate(); alert(`Skor kamu: ${score}`);
+      score += pts;
+      currentQIdx++;
+      
+      // Update skor langsung ke localStorage & broadcast
+      if(currentUser) {
+        currentUser.score = score;
+        const idx = participants.findIndex(p => p.name === currentUser.name);
+        if(idx !== -1) {
+          participants[idx] = currentUser;
+          saveParticipants();
+        }
+      }
+      
+      updateLeaderboard();
+      setTimeout(() => {
+        document.getElementById('feedbackMsg').innerHTML = '';
+        if(currentQIdx < questions.length) showQ();
+        else endQuiz();
+      }, 1000);
     }
 
-    // Admin
-    document.getElementById('loginAdminBtn').addEventListener('click',()=>{
-      if(document.getElementById('adminPass').value==='FISIKAMAGNETIK'){
-        document.getElementById('adminLock').style.display='none';
-        document.getElementById('adminPanel').style.display='block';
-        refreshAdm();
-      }else alert('Password salah!');
+    function endQuiz() {
+      quizActive = false; 
+      clearInterval(timerId);
+      
+      if(currentUser) {
+        currentUser.score = score;
+        const idx = participants.findIndex(p => p.name === currentUser.name);
+        if(idx !== -1) {
+          participants[idx] = currentUser;
+          saveParticipants();
+        }
+      }
+      
+      document.getElementById('activeQuiz').style.display = 'none';
+      document.getElementById('loginPanel').style.display = 'flex';
+      updateLeaderboard();
+      alert(`Skor kamu: ${score}`);
+    }
+
+    // ========== ADMIN ==========
+    document.getElementById('loginAdminBtn').addEventListener('click', () => {
+      if(document.getElementById('adminPass').value === 'FISIKAMAGNETIK') {
+        document.getElementById('adminLock').style.display = 'none';
+        document.getElementById('adminPanel').style.display = 'block';
+        refreshAdminData();
+      } else {
+        alert('Password salah!');
+      }
     });
-    document.getElementById('refreshAdmin').addEventListener('click',refreshAdm);
-    function refreshAdm(){
-      const d=JSON.parse(localStorage.getItem('em3dPeserta')||'[]');
-      document.getElementById('adminData').innerHTML=d.sort((a,b)=>b.score-a.score).map((p,i)=>`${i+1}. ${p.name} - ${p.score}`).join('<br>')||'Belum ada data.';
+    
+    document.getElementById('refreshAdmin').addEventListener('click', refreshAdminData);
+    
+    document.getElementById('exportCSV').addEventListener('click', () => {
+      const sorted = [...participants].sort((a,b) => b.score - a.score);
+      let csv = 'Nama,Skor\n';
+      sorted.forEach(p => { csv += `${p.name},${p.score}\n`; });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'hasil_quiz_em.csv'; a.click();
+    });
+
+    function refreshAdminData() {
+      const sorted = [...participants].sort((a,b) => b.score - a.score);
+      if (sorted.length === 0) {
+        document.getElementById('adminData').innerHTML = 'Belum ada peserta.';
+      } else {
+        document.getElementById('adminData').innerHTML = sorted.map((p,i) => 
+          `${i+1}. ${p.name} - ${p.score} poin`
+        ).join('<br>');
+      }
     }
 
     // Init
     renderTechCards();
     updateUI();
     start3D();
-    lbUpdate();
+    updateLeaderboard();
     drawTechSim();
+    
+    // Request sync saat pertama load
+    setTimeout(() => {
+      channel.postMessage({ type: 'REQUEST_SYNC' });
+    }, 500);
   })();
 </script>
 </body>
