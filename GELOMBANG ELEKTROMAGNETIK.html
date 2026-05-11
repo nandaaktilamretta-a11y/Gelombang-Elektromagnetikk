@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes, viewport-fit=cover">
+  <title>🌌 Simulasi Gelombang EM 3D Lambat | Fisika SMA</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Segoe UI', 'Poppins', sans-serif;
+      background: radial-gradient(circle at 20% 20%, #0a1128, #02040c);
+      color: #e0f0ff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.3rem;
+    }
+    .container {
+      max-width: 1300px;
+      width: 100%;
+      background: rgba(8, 18, 38, 0.8);
+      backdrop-filter: blur(25px);
+      border: 1px solid rgba(0, 180, 255, 0.35);
+      border-radius: 2rem;
+      padding: 0.8rem;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+    }
+    h1 {
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.8rem;
+      background: linear-gradient(135deg, #b3e0ff, #5b9cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+    .nav-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.3rem;
+      margin-bottom: 0.8rem;
+    }
+    .tab {
+      background: rgba(18, 28, 55, 0.7);
+      border: 1px solid #2e4b8a;
+      padding: 0.3rem 0.9rem;
+      border-radius: 1.5rem;
+      font-weight: 600;
+      color: #c6dcff;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: 0.2s;
+      font-size: 0.75rem;
+    }
+    .tab.active {
+      background: #174291;
+      border-color: #70b0ff;
+      box-shadow: 0 0 12px #1e6ef0;
+      color: white;
+    }
+    .page { display: none; animation: fade 0.3s; }
+    .page.active { display: block; }
+    @keyframes fade { from { opacity:0; } to { opacity:1; } }
+    .canvas3d-container {
+      width: 100%;
+      height: 400px;
+      border-radius: 1.2rem;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+      background: #020812;
+    }
+    .control-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
+      margin: 0.4rem 0;
+      background: #0a132a;
+      border-radius: 2rem;
+      padding: 0.4rem 0.8rem;
+    }
+    .slider-box { display: flex; flex-direction: column; align-items: center; color: #bdd6ff; font-size: 0.7rem; }
+    input[type=range] { width: 100px; accent-color: #3d8cff; }
+    .btn {
+      background: #143575; border: none; color: white; padding: 0.3rem 1rem;
+      border-radius: 1.5rem; font-weight: bold; cursor: pointer; border: 1px solid #4080e0; font-size: 0.75rem;
+    }
+    .btn:hover { background: #1f4ca0; box-shadow: 0 0 10px #0077ff; }
+    .info-panel {
+      background: rgba(255,255,255,0.04); border-radius: 1rem; padding: 0.4rem; text-align: center; font-size: 0.8rem;
+    }
+    .calc-box {
+      background: #0a1428; border-radius: 1rem; padding: 0.6rem; margin: 0.4rem 0;
+      display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; font-size: 0.8rem;
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+      gap: 0.4rem; margin: 0.4rem 0;
+    }
+    .tech-card {
+      background: #101b33; border-radius: 1rem; padding: 0.4rem; text-align: center;
+      cursor: pointer; border: 1px solid #35558b; transition: 0.2s; font-size: 0.7rem;
+    }
+    .tech-card:hover { background: #1b3260; border-color: #5da0ff; transform: translateY(-3px); }
+    .tech-icon { font-size: 1.3rem; display: block; }
+    .spectrum-bar {
+      height: 6px; border-radius: 3px; margin: 0.4rem 0;
+      background: linear-gradient(to right, #2a4a9e, #3b82c4, #b53b3b, #f59e0b, #b453cf, #f0f9ff, #d946ef);
+    }
+    .login-area { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; }
+    input[type="text"], input[type="password"] {
+      padding: 0.4rem; border-radius: 1.2rem; background: #15203b; border: 1px solid #3c60aa; color: white; font-size: 0.8rem;
+    }
+    .leaderboard { background: #0e1a2b; border-radius: 1rem; padding: 0.5rem; margin-top: 0.5rem; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>✨ GELOMBANG ELEKTROMAGNETIK 3D ✨</h1>
+  <div class="nav-tabs">
+    <div class="tab active" data-tab="simulasi">📡 Simulasi 3D</div>
+    <div class="tab" data-tab="aplikasi">📱 Teknologi</div>
+    <div class="tab" data-tab="quiz">🧠 Quiz</div>
+    <div class="tab" data-tab="admin">🔐 Admin</div>
+  </div>
+
+  <!-- SIMULASI 3D -->
+  <div id="pageSimulasi" class="page active">
+    <div class="canvas3d-container" id="threeContainer"></div>
+    <div class="control-row">
+      <button class="btn" id="playPause3d">⏯️ Play/Pause</button>
+      <div class="slider-box">
+        <label>🔹 Frekuensi (log Hz)</label>
+        <input type="range" id="freqLogSlider" min="3" max="20" value="14.5" step="0.05">
+        <span id="freqDisplay">10<sup>14.5</sup> Hz</span>
+      </div>
+      <div class="slider-box">
+        <label>📏 Panjang Gelombang (m)</label>
+        <input type="range" id="lambdaLogSlider" min="-12" max="3" value="-6.5" step="0.05">
+        <span id="lambdaDisplay">10<sup>-6.5</sup> m</span>
+      </div>
+    </div>
+    <div class="calc-box">
+      <span>🔹 c = λ × f</span>
+      <span>λ = <span id="lambdaVal">5.45e-7</span> m</span>
+      <span>f = <span id="freqVal">5.50e14</span> Hz</span>
+      <span>c = <span id="cVal">3.00e8</span> m/s</span>
+    </div>
+    <div class="info-panel">
+      🌈 Spektrum: <strong id="spectrumName">Cahaya Tampak</strong> |
+      Energi foton: <span id="energyValue">3.6e-19 J</span><br>
+      <small>🟥 E (listrik) · 🟦 B (magnet) · ➡️ Propagasi Z (sangat lambat)</small>
+    </div>
+  </div>
+
+  <!-- TEKNOLOGI -->
+  <div id="pageAplikasi" class="page">
+    <h3 style="text-align:center; margin-bottom:0.4rem;">📡 Teknologi & Spektrum Gelombang EM</h3>
+    <div class="spectrum-bar"></div>
+    <div class="cards-grid" id="techCards"></div>
+    <canvas id="techCanvas2D" width="800" height="230" style="width:100%; background:#0a1020; border-radius:1rem; margin-top:0.5rem;"></canvas>
+    <div id="techDesc" class="info-panel">Klik kartu untuk melihat representasi gelombang EM pada teknologi tersebut.</div>
+  </div>
+
+  <!-- QUIZ -->
+  <div id="pageQuiz" class="page">
+    <div style="background:#0c1428; border-radius:1.2rem; padding:1rem;">
+      <div id="loginPanel" class="login-area">
+        <input type="text" id="studentName" placeholder="Nama kamu">
+        <button class="btn" id="joinQuizBtn">Mulai Quiz</button>
+      </div>
+      <div id="activeQuiz" style="display:none;">
+        <div style="display:flex; justify-content:space-between;"><span id="qCounter">1/10</span><span id="timerSpan">⏳ 10s</span></div>
+        <h3 id="qText"></h3>
+        <div id="optionsBox" style="display:flex; flex-direction:column; gap:0.3rem;"></div>
+        <div id="feedbackMsg"></div>
+        <div class="leaderboard"><h4>🏆 Leaderboard</h4><div id="liveRanking"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="pageAdmin" class="page">
+    <div id="adminLock" style="text-align:center; padding:2rem;">
+      <h3>🔐 Akses Guru</h3>
+      <input type="password" id="adminPass" placeholder="Password">
+      <button class="btn" id="loginAdminBtn">Masuk</button>
+    </div>
+    <div id="adminPanel" style="display:none;">
+      <h3>📋 Data Peserta</h3>
+      <button class="btn" id="refreshAdmin">Refresh</button>
+      <div id="adminData" style="margin-top:1rem;"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.126.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.126.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+  (() => {
+    // Global state
+    const c = 3e8;
+    let logFreq = 14.5;      // log10(Hz)
+    let isPlaying = true;
+    let participants = JSON.parse(localStorage.getItem('em3dPeserta') || '[]');
+    let currentUser = null, quizActive = false, currentQIdx = 0, score = 0, timerId = null, timeRemain = 10;
+    const questions = [
+      { q:"Gelombang elektromagnetik terdiri dari?", o:["Medan listrik & medan magnet","Proton & elektron","Bunyi & cahaya","Energi & massa"], a:0},
+      { q:"GEM dapat merambat tanpa?", o:["Energi","Frekuensi","Medium","Cahaya"], a:2},
+      { q:"Remote TV menggunakan gelombang?", o:["Radio","Inframerah","Gamma","Ultraviolet"], a:1},
+      { q:"Energi terbesar dimiliki?", o:["Radio","Cahaya tampak","Sinar gamma","Mikro"], a:2},
+      { q:"Cahaya matahari sampai karena?", o:["Udara","Medium air","Tanpa medium","Lambat"], a:2},
+      { q:"Rumus gelombang elektromagnetik?", o:["F=ma","c=λf","W=Fs","P=IV"], a:1},
+      { q:"Frekuensi naik maka panjang gelombang?", o:["Membesar","Tetap","Mengecil","Hilang"], a:2},
+      { q:"Sinar gamma berbahaya karena?", o:["Energi besar","Lambat","Tanpa energi","Tanpa frek"], a:0},
+      { q:"WiFi frek tinggi menyebabkan?", o:["Jangkauan jauh","Transfer cepat","Tak bisa","Energi hilang"], a:1},
+      { q:"GPS memakai gelombang?", o:["Mikro","Sinar X","UV","Cahaya tampak"], a:0}
+    ];
+
+    // Audio
+    let audioCtx = null;
+    function initAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.value = 85;
+      gain.gain.value = 0.015;
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start();
+    }
+    document.body.addEventListener('click', initAudio, { once: true });
+
+    // Tab navigation
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('page' + target.charAt(0).toUpperCase() + target.slice(1)).classList.add('active');
+        if (target === 'simulasi') start3D();
+        else stop3D();
+        if (target === 'admin') { document.getElementById('adminPanel').style.display = 'none'; document.getElementById('adminLock').style.display = 'block'; }
+      });
+    });
+
+    // ---------- 3D SIMULATION (SUPER LAMBAT) ----------
+    let scene, camera, renderer, controls, waveGroup, animationId;
+    const container3D = document.getElementById('threeContainer');
+    const timeScale = 0.001;  // sangat lambat agar propagasi teramati
+
+    function init3D() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x020812);
+      camera = new THREE.PerspectiveCamera(45, container3D.clientWidth / container3D.clientHeight, 0.1, 1000);
+      camera.position.set(3.5, 3.2, 6.5);
+      camera.lookAt(0, 0, 1.8);
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(container3D.clientWidth, container3D.clientHeight);
+      container3D.appendChild(renderer.domElement);
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.04;
+      controls.target.set(0, 0, 1.8);
+      controls.update();
+
+      // Sumbu tipis
+      const axisLen = 3.2;
+      const makeAxis = (dir, color) => {
+        const mat = new THREE.LineBasicMaterial({ color });
+        const pts = [new THREE.Vector3(0,0,0), dir.clone().multiplyScalar(axisLen)];
+        scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+      };
+      makeAxis(new THREE.Vector3(1,0,0), 0x994444);
+      makeAxis(new THREE.Vector3(0,1,0), 0x449944);
+      makeAxis(new THREE.Vector3(0,0,1), 0x446699);
+
+      const grid = new THREE.GridHelper(6, 16, 0x334466, 0x223355);
+      grid.position.z = 1.8;
+      scene.add(grid);
+
+      waveGroup = new THREE.Group();
+      scene.add(waveGroup);
+    }
+
+    function updateWave3D() {
+      if (!waveGroup) return;
+      while (waveGroup.children.length > 0) waveGroup.remove(waveGroup.children[0]);
+
+      const freq = Math.pow(10, logFreq);
+      const lambda = c / freq;
+      const k = (2 * Math.PI) / lambda;
+      const omega = 2 * Math.PI * freq;
+      const t = performance.now() / 1000 * timeScale;
+      const amplitude = 0.85;
+      const zStart = -0.8, zEnd = 4.2, segments = 320;
+      const step = (zEnd - zStart) / segments;
+
+      // E field (merah)
+      const ptsE = [];
+      for (let i = 0; i <= segments; i++) {
+        const z = zStart + i * step;
+        ptsE.push(new THREE.Vector3(amplitude * Math.sin(k * z - omega * t), 0, z));
+      }
+      waveGroup.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(ptsE),
+        new THREE.LineBasicMaterial({ color: 0xff5555 })
+      ));
+
+      // B field (biru)
+      const ptsB = [];
+      for (let i = 0; i <= segments; i++) {
+        const z = zStart + i * step;
+        ptsB.push(new THREE.Vector3(0, amplitude * Math.cos(k * z - omega * t), z));
+      }
+      waveGroup.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(ptsB),
+        new THREE.LineBasicMaterial({ color: 0x5588ff })
+      ));
+
+      // Titik kecil untuk menandai puncak
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0xffaaaa });
+      for (let z = zStart; z <= zEnd; z += 0.25) {
+        const x = amplitude * Math.sin(k * z - omega * t);
+        if (Math.abs(x) > 0.65) {
+          const dot = new THREE.Mesh(new THREE.SphereGeometry(0.03, 3), dotMat);
+          dot.position.set(x, 0, z);
+          waveGroup.add(dot);
+        }
+      }
+    }
+
+    let threeActive = false;
+    function animate3D() {
+      if (!threeActive) return;
+      animationId = requestAnimationFrame(animate3D);
+      updateWave3D();
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    function start3D() { if (!scene) init3D(); threeActive = true; animate3D(); }
+    function stop3D() { threeActive = false; if (animationId) cancelAnimationFrame(animationId); }
+
+    // Sliders & perhitungan
+    document.getElementById('freqLogSlider').addEventListener('input', (e) => { logFreq = parseFloat(e.target.value); updateUI(); });
+    document.getElementById('lambdaLogSlider').addEventListener('input', (e) => {
+      logFreq = Math.log10(c / Math.pow(10, parseFloat(e.target.value)));
+      updateUI();
+    });
+    function updateUI() {
+      const freq = Math.pow(10, logFreq);
+      const lambda = c / freq;
+      document.getElementById('freqDisplay').innerHTML = `10<sup>${logFreq.toFixed(2)}</sup> Hz`;
+      document.getElementById('lambdaDisplay').innerHTML = `10<sup>${Math.log10(lambda).toFixed(2)}</sup> m`;
+      document.getElementById('freqLogSlider').value = logFreq;
+      document.getElementById('lambdaLogSlider').value = Math.log10(lambda);
+      document.getElementById('lambdaVal').textContent = lambda.toExponential(2);
+      document.getElementById('freqVal').textContent = freq.toExponential(2);
+      document.getElementById('cVal').textContent = c.toExponential(2);
+      const spec = getSpectrum(logFreq);
+      document.getElementById('spectrumName').textContent = spec.name;
+      document.getElementById('energyValue').textContent = (6.626e-34 * freq).toExponential(2) + ' J';
+    }
+    function getSpectrum(logF) {
+      if (logF < 5) return { name:'Radio', color:'#2a4a9e' };
+      if (logF < 9) return { name:'Mikro', color:'#3b82c4' };
+      if (logF < 12) return { name:'Inframerah', color:'#b53b3b' };
+      if (logF < 15.2) return { name:'Cahaya Tampak', color:'#f59e0b' };
+      if (logF < 16.5) return { name:'Ultraviolet', color:'#b453cf' };
+      if (logF < 18.5) return { name:'Sinar X', color:'#f0f9ff' };
+      return { name:'Sinar Gamma', color:'#d946ef' };
+    }
+
+    document.getElementById('playPause3d').addEventListener('click', () => { isPlaying = !isPlaying; });
+
+    // ---------- TEKNOLOGI 2D + SPEKTRUM ----------
+    const techCanvas = document.getElementById('techCanvas2D');
+    const tctx = techCanvas.getContext('2d');
+    let techAnimId, currentTech = 'wifi';
+    const techDB = {
+      wifi:   { icon:'📶', nama:'WiFi', color:'#4a9eff', freqGHz:2.4,  logF:9.4, desc:'Gelombang radio/mikro dari router ke perangkat.' },
+      radio:  { icon:'📻', nama:'Radio', color:'#3a6ea5', freqGHz:0.1, logF:8, desc:'Stasiun radio memancarkan sinyal audio.' },
+      gps:    { icon:'🛰️', nama:'GPS', color:'#5b9bd5', freqGHz:1.5, logF:9.2, desc:'Satelit mengirim sinyal mikro ke penerima.' },
+      remote: { icon:'📺', nama:'Remote TV', color:'#e06c6c', freqGHz:300, logF:11.5, desc:'LED inframerah mengirim pulsa ke sensor.' },
+      sinarx: { icon:'🩻', nama:'Sinar X', color:'#f0f9ff', freqGHz:1e9, logF:18, desc:'Sinar X menembus tubuh untuk citra.' },
+      microwave:{ icon:'♨️', nama:'Microwave', color:'#4a9eff', freqGHz:2.45, logF:9.4, desc:'Memutar molekul air, menghasilkan panas.' },
+      hp:     { icon:'📱', nama:'HP', color:'#2a4a9e', freqGHz:0.8, logF:8.9, desc:'HP mengirim sinyal ke BTS.' }
+    };
+
+    function drawTechSim() {
+      tctx.clearRect(0, 0, techCanvas.width, techCanvas.height);
+      const tech = techDB[currentTech];
+      const w = techCanvas.width, h = techCanvas.height;
+      const freq = tech.freqGHz * 1e9;
+      const omega = 2 * Math.PI * freq;
+      const t = performance.now() / 1000 * 0.15; // juga lambat
+      const amplitude = 38;
+      const srcX = 90, dstX = w - 90, midY = h/2;
+
+      // Spektrum warna background
+      const grad = tctx.createLinearGradient(0, 0, w, 0);
+      grad.addColorStop(0, '#2a4a9e'); grad.addColorStop(0.2, '#3b82c4'); grad.addColorStop(0.4, '#b53b3b');
+      grad.addColorStop(0.55, '#f59e0b'); grad.addColorStop(0.7, '#b453cf'); grad.addColorStop(0.85, '#f0f9ff'); grad.addColorStop(1, '#d946ef');
+      tctx.fillStyle = grad;
+      tctx.globalAlpha = 0.06;
+      tctx.fillRect(0, 0, w, h);
+      tctx.globalAlpha = 1;
+
+      // Sumber & Penerima
+      tctx.fillStyle = '#1e3044';
+      tctx.fillRect(srcX-28, midY-28, 56, 56);
+      tctx.fillRect(dstX-28, midY-28, 56, 56);
+      tctx.fillStyle = 'white';
+      tctx.font = '18px sans-serif';
+      tctx.fillText(tech.icon, srcX-14, midY+6);
+      tctx.fillText('📡', dstX-14, midY+6);
+      tctx.font = '11px sans-serif';
+      tctx.fillText('Sumber', srcX-24, midY+45);
+      tctx.fillText('Penerima', dstX-28, midY+45);
+
+      // Indikator spektrum
+      tctx.fillStyle = tech.color;
+      tctx.fillRect(20, 20, 60, 6);
+      tctx.fillStyle = 'white';
+      tctx.font = '10px sans-serif';
+      tctx.fillText(`λ ≈ ${(c/freq).toExponential(1)} m`, 20, 16);
+
+      // Gelombang EM
+      tctx.beginPath();
+      tctx.strokeStyle = tech.color;
+      tctx.lineWidth = 2.5;
+      tctx.shadowColor = tech.color;
+      tctx.shadowBlur = 7;
+      for (let x = srcX; x < dstX; x += 2) {
+        const z = (x - srcX) / 70;
+        const y = midY + amplitude * Math.sin(z * 2.8 - omega * t);
+        if (x === srcX) tctx.moveTo(x, y); else tctx.lineTo(x, y);
+      }
+      tctx.stroke();
+      tctx.shadowBlur = 0;
+
+      tctx.fillStyle = '#ffaaaa';
+      tctx.font = '11px sans-serif';
+      tctx.fillText('E (listrik) ↕️', 30, h-20);
+      tctx.fillStyle = '#aaaaff';
+      tctx.fillText('B (magnet) ⊙', 30, h-6);
+      techAnimId = requestAnimationFrame(drawTechSim);
+    }
+
+    function renderTechCards() {
+      const container = document.getElementById('techCards');
+      container.innerHTML = '';
+      Object.entries(techDB).forEach(([key, val]) => {
+        const card = document.createElement('div');
+        card.className = 'tech-card';
+        card.innerHTML = `<span class="tech-icon">${val.icon}</span><strong>${val.nama}</strong>`;
+        card.onclick = () => {
+          currentTech = key;
+          document.getElementById('techDesc').innerHTML = `<strong>${val.nama}</strong>: ${val.desc} (${val.freqGHz} GHz)`;
+          if (techAnimId) cancelAnimationFrame(techAnimId);
+          drawTechSim();
+        };
+        container.appendChild(card);
+      });
+    }
+
+    // Quiz
+    function save() { localStorage.setItem('em3dPeserta', JSON.stringify(participants)); }
+    function lbUpdate() {
+      const sorted = [...participants].sort((a,b)=>b.score-a.score);
+      document.getElementById('liveRanking').innerHTML = sorted.slice(0,6).map((p,i)=>`${i+1}. ${p.name} - ${p.score}`).join('<br>');
+    }
+    document.getElementById('joinQuizBtn').addEventListener('click', ()=>{
+      const name = document.getElementById('studentName').value.trim();
+      if(!name) return alert('Masukkan nama!');
+      currentUser={name,score:0}; score=0; currentQIdx=0; quizActive=true;
+      document.getElementById('loginPanel').style.display='none';
+      document.getElementById('activeQuiz').style.display='block';
+      showQ();
+    });
+    function showQ() {
+      if(currentQIdx>=questions.length){ endQuiz(); return; }
+      const q=questions[currentQIdx];
+      document.getElementById('qCounter').textContent=`${currentQIdx+1}/${questions.length}`;
+      document.getElementById('qText').textContent=q.q;
+      const opt=document.getElementById('optionsBox'); opt.innerHTML='';
+      timeRemain=10; const qs=Date.now();
+      document.getElementById('timerSpan').textContent=`⏳ ${timeRemain}s`;
+      clearInterval(timerId);
+      timerId=setInterval(()=>{
+        timeRemain--;
+        document.getElementById('timerSpan').textContent=`⏳ ${timeRemain}s`;
+        if(timeRemain<=0){ clearInterval(timerId); handleA(-1,qs); }
+      },1000);
+      q.o.forEach((o,i)=>{
+        const b=document.createElement('button'); b.className='btn'; b.textContent=o;
+        b.onclick=()=>handleA(i,qs); opt.appendChild(b);
+      });
+    }
+    function handleA(chosen,qs){
+      clearInterval(timerId);
+      const correct=questions[currentQIdx].a;
+      const elapsed=(Date.now()-qs)/1000;
+      let pts=0;
+      if(chosen===correct){
+        pts=Math.max(10,Math.round(100-elapsed*9));
+        document.getElementById('feedbackMsg').innerHTML='✅ Benar!';
+      } else document.getElementById('feedbackMsg').innerHTML='❌ Salah';
+      score+=pts; currentQIdx++;
+      if(currentUser) currentUser.score=score;
+      lbUpdate();
+      setTimeout(()=>{
+        document.getElementById('feedbackMsg').innerHTML='';
+        if(currentQIdx<questions.length) showQ();
+        else endQuiz();
+      },1000);
+    }
+    function endQuiz(){
+      quizActive=false; clearInterval(timerId);
+      if(currentUser){
+        const idx=participants.findIndex(p=>p.name===currentUser.name);
+        if(idx!==-1) participants[idx]=currentUser; else participants.push(currentUser);
+        save();
+      }
+      document.getElementById('activeQuiz').style.display='none';
+      document.getElementById('loginPanel').style.display='flex';
+      lbUpdate(); alert(`Skor kamu: ${score}`);
+    }
+
+    // Admin
+    document.getElementById('loginAdminBtn').addEventListener('click',()=>{
+      if(document.getElementById('adminPass').value==='FISIKAMAGNETIK'){
+        document.getElementById('adminLock').style.display='none';
+        document.getElementById('adminPanel').style.display='block';
+        refreshAdm();
+      }else alert('Password salah!');
+    });
+    document.getElementById('refreshAdmin').addEventListener('click',refreshAdm);
+    function refreshAdm(){
+      const d=JSON.parse(localStorage.getItem('em3dPeserta')||'[]');
+      document.getElementById('adminData').innerHTML=d.sort((a,b)=>b.score-a.score).map((p,i)=>`${i+1}. ${p.name} - ${p.score}`).join('<br>')||'Belum ada data.';
+    }
+
+    // Init
+    renderTechCards();
+    updateUI();
+    start3D();
+    lbUpdate();
+    drawTechSim();
+  })();
+</script>
+</body>
+</html>
